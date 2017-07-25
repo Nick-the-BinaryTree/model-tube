@@ -2,19 +2,18 @@
 
 // Stored settings
 
-let settings = {
-  es_host: 'cideruconn_elasticsearch_1:9200',
-  models_path: '../../packages/cider-back/models'
-}
+let settings = require('./settings')
 
 // ==========================================================================================================================
-
 // Functionality
 
 const config = newSettings => {
-  settings.es_host = newSettings.es_host
-  settings.models_path = newSettings.models_path
-  console.log('Configuration updated. Very nice.')
+  const fs = require('fs')
+  settings.es_host = newSettings.es_host || settings.es_host // Copy over new relevant settings or keep old
+  settings.models_path = newSettings.models_path || settings.models_path
+  fs.writeFile('settings.json', JSON.stringify(settings), () => {
+    console.log('Configuration updated. Very nice.')
+  })
 }
 
 const index = models => {
