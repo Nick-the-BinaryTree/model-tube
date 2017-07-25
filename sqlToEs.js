@@ -2,16 +2,26 @@
 
 // Stored settings
 
-let settings = require('./settings')
+// Need absolute path with __dirname b/c otherwise path will be relative to where command is run
+const path = require('path')
+const settingsPath = path.join(__dirname, '/settings.json')
+
+let settings = null
+try {
+  settings = require(settingsPath)
+} catch (e) {
+  settings = {}
+}
 
 // ==========================================================================================================================
 // Functionality
 
 const config = newSettings => {
+  console.log(__dirname)
   const fs = require('fs')
   settings.es_host = newSettings.es_host || settings.es_host // Copy over new relevant settings or keep old
   settings.models_path = newSettings.models_path || settings.models_path
-  fs.writeFile('settings.json', JSON.stringify(settings), () => {
+  fs.writeFile(settingsPath, JSON.stringify(settings), () => {
     console.log('Configuration updated. Very nice.')
   })
 }
@@ -96,7 +106,7 @@ const printUsage = () => {
 const args = process.argv.slice(2) // First two args are "node" and [filename]
 
 if (args.length > 0) {
-  if ((args[0] === 'config' || args[0] === 'c') && args.length === 3) {
+  if ((args[0] === 'config' || args[0] === 'c') && args.length >= 2) {
     config({es_host: args[1], models_path: args[2]})
   } else if (args[0] === 'index' || args[0] === 'i') {
     index(args.slice(1))
