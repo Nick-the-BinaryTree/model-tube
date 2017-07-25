@@ -6,7 +6,7 @@
     "models_path": "/models",
     "es_server": "http://localhost:9200"
   },
-  "bin": "./sqlToEs.js",
+  "bin": "./index.js",
   "author": "Nicholas Hartunian",
   "license": "MIT",
   "devDependencies": {

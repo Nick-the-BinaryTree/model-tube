@@ -38,7 +38,7 @@ const index = models => {
     log: 'error'
   })
 
-  toIndex = models.length > 0 ? models : Object.keys(require(path)).slice(0, -2) // Last 2 items are Sequelize boilerplate
+  toIndex = models && models.length > 0 ? models : Object.keys(require(path)).slice(0, -2) // Last 2 items are Sequelize boilerplate
 
   toIndex.forEach(async name => {
     const model = require(path)[name]
@@ -103,18 +103,20 @@ const printUsage = () => {
 // ==========================================================================================================================
 // Process command if being used as CLI
 
-const args = process.argv.slice(2) // First two args are "node" and [filename]
+if (process.argv.length > 2) { // CLI will have a third arg
+  const args = process.argv.slice(2) // First two args are "node" and [filename]
 
-if (args.length > 0) {
-  if ((args[0] === 'config' || args[0] === 'c') && args.length >= 2) {
-    config({es_host: args[1], models_path: args[2]})
-  } else if (args[0] === 'index' || args[0] === 'i') {
-    index(args.slice(1))
+  if (args.length > 0) {
+    if ((args[0] === 'config' || args[0] === 'c') && args.length >= 2) {
+      config({es_host: args[1], models_path: args[2]})
+    } else if (args[0] === 'index' || args[0] === 'i') {
+      index(args.slice(1))
+    } else {
+      printUsage()
+    }
   } else {
     printUsage()
   }
-} else {
-  printUsage()
 }
 
 module.exports = { config, index }
