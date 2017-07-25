@@ -4,7 +4,7 @@
 
 let settings = {
   es_host: 'cideruconn_elasticsearch_1:9200',
-  models_path: './packages/cider-back/models'
+  models_path: '../../packages/cider-back/models'
 }
 
 // ==========================================================================================================================
@@ -18,8 +18,8 @@ const config = newSettings => {
 }
 
 const index = models => {
-  let host = config.es_host
-  let path = config.models_path
+  let host = settings.es_host
+  let path = settings.models_path
   let toIndex = []
   let completeCount = 0
 
@@ -29,7 +29,7 @@ const index = models => {
     log: 'error'
   })
 
-  toIndex = models.length > 0 ? args : Object.keys(require(path)).slice(0, -2) // Last 2 items are Sequelize boilerplate
+  toIndex = models.length > 0 ? models : Object.keys(require(path)).slice(0, -2) // Last 2 items are Sequelize boilerplate
 
   toIndex.forEach(async name => {
     const model = require(path)[name]
@@ -80,7 +80,8 @@ const printUsage = () => {
   console.log('Usage:')
   console.log('\nConfiguration Command')
   console.log('sql-to-es config [Elasticsearch server address] [Sequelize models folder path]')
-  console.log('Ex: sql-to-es config http://localhost:9200 ./models')
+  console.log('Note: Models path is absolute from system root or relative from node_modules/sql-to-es')
+  console.log('Ex: sql-to-es config http://localhost:9200 ../../models')
   console.log('\nIndex Command')
   console.log('sql-to-es index [optional: specific model names to index space-separated]')
   console.log('Ex: sql-to-es index Facility Resource')
@@ -96,7 +97,7 @@ const printUsage = () => {
 const args = process.argv.slice(2) // First two args are "node" and [filename]
 
 if (args.length > 0) {
-  if (args[0] === 'config' || args[0] === 'c') {
+  if ((args[0] === 'config' || args[0] === 'c') && args.length === 3) {
     config({es_host: args[1], models_path: args[2]})
   } else if (args[0] === 'index' || args[0] === 'i') {
     index(args.slice(1))
