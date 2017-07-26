@@ -1,1 +1,1 @@
-{"es_host":"cideruconn_elasticsearch_1:9200","models_path":"../../packages/cider-back/models"}
+{"es_host":"http://localhost:9200","models_path":"../../models"}

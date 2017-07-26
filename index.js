@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+//TODO: app_index and make configurable
 // Stored settings
 
 // Need absolute path with __dirname b/c otherwise path will be relative to where command is run
@@ -10,7 +11,16 @@ let settings = null
 try {
   settings = require(settingsPath)
 } catch (e) {
+  console.log('Please configure settings')
+  console.log('sql-to-es config [Elasticsearch server address] [Sequelize models folder path]')
   settings = {}
+}
+
+// ==========================================================================================================================
+// Sequelize Hooks
+
+const setupHooks = () => {
+
 }
 
 // ==========================================================================================================================
@@ -42,6 +52,7 @@ const index = models => {
 
   toIndex.forEach(async name => {
     const model = require(path)[name]
+    console.log(model)
     const lowerName = name.toLowerCase() // Lowercase required by ES
 
     try {
