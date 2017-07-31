@@ -1,77 +1,91 @@
 #!/usr/bin/env node
 
-//TODO: app_index and make configurable
+// ==========================================================================================================================
+// Imports
+const elasticsearch = require('elasticsearch')
+
+// ==========================================================================================================================
 // Stored settings
 
 // Need absolute path with __dirname b/c otherwise path will be relative to where command is run
-const path = require('path')
-const settingsPath = path.join(__dirname, '/settings.json')
+const thisPath = require('path')
+const settingsPath = thisPath.join(__dirname, '/settings.json')
 
 let settings = null
+let client = null
 try {
   settings = require(settingsPath)
+  client = new elasticsearch.Client({
+    host: settings.es_host,
+    log: 'error'
+  })
 } catch (e) {
   console.log('Please configure settings')
   console.log('sql-to-es config [Elasticsearch server address] [Sequelize models folder path]')
-  settings = {}
 }
 
 // ==========================================================================================================================
-// Sequelize Hooks
+// Create Elasticsearch Client and Sequelize Hooks
 
-const setupHooks = () => {
-
-}
+// const setup = () => {
+//   const toHook = Object.keys(require(settings.models_path)).slice(0, -2)
+//   toHook.forEach(model => {
+//     model.hook('afterSave', (_model, options) =>{
+//
+//     })
+//     model.hook('afterDestroy', (_model, options) =>{
+//
+//     })
+//   })
+// }
 
 // ==========================================================================================================================
 // Functionality
 
 const config = newSettings => {
-  console.log(__dirname)
   const fs = require('fs')
   settings.es_host = newSettings.es_host || settings.es_host // Copy over new relevant settings or keep old
   settings.models_path = newSettings.models_path || settings.models_path
+  settings.es_index = newSettings.es_index || settings.es_index
   fs.writeFile(settingsPath, JSON.stringify(settings), () => {
     console.log('Configuration updated. Very nice.')
   })
 }
 
-const index = models => {
-  let host = settings.es_host
-  let path = settings.models_path
+const index = async models => {
+  try {
+    // If no awaits, these will run out of order
+    await client.indices.delete({ // Wipe current values
+      index: settings.es_index
+    })
+    await client.indices.create({ // Needs to exist before adding
+      index: settings.es_index
+    })
+  } catch (error) {
+    console.log('\nIssue deleting and recreating index\n')
+    console.log(error)
+    return
+  }
+
   let toIndex = []
   let completeCount = 0
 
-  const elasticsearch = require('elasticsearch')
-  const client = new elasticsearch.Client({
-    host: host,
-    log: 'error'
-  })
-
-  toIndex = models && models.length > 0 ? models : Object.keys(require(path)).slice(0, -2) // Last 2 items are Sequelize boilerplate
+  toIndex = models && models.length > 0
+    ? models // Last 2 items are Sequelize boilerplate
+    : Object.keys(require(settings.models_path)).slice(0, -2)
 
   toIndex.forEach(async name => {
-    const model = require(path)[name]
-    console.log(model)
-    const lowerName = name.toLowerCase() // Lowercase required by ES
+    const model = require(settings.models_path)[name]
 
     try {
-      // If no awaits, these will run out of order
-      await client.indices.delete({ // Wipe current values
-        index: lowerName
-      })
-      await client.indices.create({ // Needs to exist before adding
-        index: lowerName
-      })
-
       const models = await model.findAll()
       let data = []
       models.forEach(item => { // 2 JSON objects must be pushed for each model w/ ES bulk
         data.push({
           // Searching many indices w/ 1 type each has same performance as 1 index w/ many types
           index: {
-            _index: lowerName,
-            _type: lowerName,
+            _index: settings.es_index,
+            _type: name.toLowerCase(), // Lowercase required by ES
             _id: item.id
           }
         })
@@ -102,6 +116,8 @@ const printUsage = () => {
   console.log('sql-to-es config [Elasticsearch server address] [Sequelize models folder path]')
   console.log('Note: Models path is absolute from system root or relative from node_modules/sql-to-es')
   console.log('Ex: sql-to-es config http://localhost:9200 ../../models')
+  console.log('You can also override the default ES index, "app_index":')
+  console.log('sql-to-es config -i [new index name]')
   console.log('\nIndex Command')
   console.log('sql-to-es index [optional: specific model names to index space-separated]')
   console.log('Ex: sql-to-es index Facility Resource')
@@ -119,7 +135,11 @@ if (process.argv.length > 2) { // CLI will have a third arg
 
   if (args.length > 0) {
     if ((args[0] === 'config' || args[0] === 'c') && args.length >= 2) {
-      config({es_host: args[1], models_path: args[2]})
+      if (args[1] === '-i') {
+        config({es_index: args[2]})
+      } else {
+        config({es_host: args[1], models_path: args[2]})
+      }
     } else if (args[0] === 'index' || args[0] === 'i') {
       index(args.slice(1))
     } else {
