@@ -58,11 +58,16 @@ const index = async models => {
     await client.indices.delete({ // Wipe current values
       index: settings.es_index
     })
-    await client.indices.create({ // Needs to exist before adding
+  } catch (error) {
+    console.log(error)
+    console.log('\nGoing to try creating new index: ' + settings.es_index + '\n')
+  }
+  try {
+    await client.indices.create({
       index: settings.es_index
     })
   } catch (error) {
-    console.log('\nIssue deleting and recreating index\n')
+    console.log('\nIssue deleting index\n')
     console.log(error)
     return
   }
