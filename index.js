@@ -1,43 +1,50 @@
 #!/usr/bin/env node
-
 // ==========================================================================================================================
-// Imports
-const elasticsearch = require('elasticsearch')
+// Globals
 
-// ==========================================================================================================================
-// Stored settings
-
-// Need absolute path with __dirname b/c otherwise path will be relative to where command is run
-const thisPath = require('path')
-const settingsPath = thisPath.join(__dirname, '/settings.json')
-
+let settingsPath = null
 let settings = null
 let client = null
-try {
-  settings = require(settingsPath)
-  client = new elasticsearch.Client({
-    host: settings.es_host,
-    log: 'error'
-  })
-} catch (e) {
-  console.log('Please configure settings')
-  console.log('sql-to-es config [Elasticsearch server address] [Sequelize models folder path]')
-}
 
 // ==========================================================================================================================
-// Create Elasticsearch Client and Sequelize Hooks
+// Import settings, create Elasticsearch client, and add sequelize hooks
 
-// const setup = () => {
-//   const toHook = Object.keys(require(settings.models_path)).slice(0, -2)
-//   toHook.forEach(model => {
-//     model.hook('afterSave', (_model, options) =>{
-//
-//     })
-//     model.hook('afterDestroy', (_model, options) =>{
-//
-//     })
-//   })
-// }
+const setup = () => {
+  const thisPath = require('path')
+  const settingsPath = thisPath.join(__dirname, '/settings.json')
+  try {
+    settings = require(settingsPath)
+    const elasticsearch = require('elasticsearch')
+    client = new elasticsearch.Client({
+      host: settings.es_host,
+      log: 'error'
+    })
+  } catch (error) {
+    console.log('\nPlease configure settings')
+    console.log('sql-to-es config [Elasticsearch server address] [Sequelize models folder path]\n')
+    console.log(error)
+    return
+  }
+  try {
+    const toHook = Object.keys(require(settings.models_path)).slice(0, -2)
+    toHook.forEach(name => {
+      const model = require(settings.models_path)[name]
+      // Upsert hook wasn't working (create or update)
+      model.hook('afterCreate', (_model, options) => {
+        console.log('Create hook fired')
+      })
+      model.hook('afterUpdate', (_model, options) => {
+        console.log('Update hook fired')
+      })
+      model.hook('afterDestroy', (_model, options) => {
+        console.log('Destroy hook fired')
+      })
+    })
+  } catch (error) {
+    console.log('\nError setting up Sequelize hooks\n')
+    console.log(error)
+  }
+}
 
 // ==========================================================================================================================
 // Functionality
@@ -115,6 +122,24 @@ const index = async models => {
   })
 }
 
+const testHooks = async () => {
+  const Order = require(settings.models_path)['Order']
+  console.log('Creating')
+  await Order.create({
+    id: 17,
+    submittingUserId: 1,
+    request: '{ "good day": "tortoise" }',
+    createdAt: new Date(),
+    updatedAt: new Date()})
+  console.log('Modifying')
+  let testOrder = await Order.findById(17)
+  console.log(JSON.stringify(testOrder))
+  testOrder.request = '{ "good day": "pinata" }'
+  console.log(JSON.stringify(testOrder))
+  console.log('Destroying')
+  testOrder.destroy()
+}
+
 const printUsage = () => {
   console.log('Usage:')
   console.log('\nConfiguration Command')
@@ -135,6 +160,8 @@ const printUsage = () => {
 // ==========================================================================================================================
 // Process command if being used as CLI
 
+setup()
+
 if (process.argv.length > 2) { // CLI will have a third arg
   const args = process.argv.slice(2) // First two args are "node" and [filename]
 
@@ -147,6 +174,8 @@ if (process.argv.length > 2) { // CLI will have a third arg
       }
     } else if (args[0] === 'index' || args[0] === 'i') {
       index(args.slice(1))
+    } else if (args[0] === 'testHooks') {
+      testHooks()
     } else {
       printUsage()
     }
