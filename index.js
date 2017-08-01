@@ -21,7 +21,7 @@ const setup = () => {
     })
   } catch (error) {
     console.log('\nPlease configure settings')
-    console.log('sql-to-es config [Elasticsearch server address] [Sequelize models folder path]\n')
+    console.log('tube config [Elasticsearch server address] [Sequelize models folder path]\n')
     console.log(error)
     return
   }
@@ -135,16 +135,16 @@ const testHooks = async () => {
 const printUsage = () => {
   console.log('Usage:')
   console.log('\nConfiguration Command')
-  console.log('sql-to-es config [Elasticsearch server address] [Sequelize models folder path]')
-  console.log('Note: Models path is absolute from system root or relative from node_modules/sql-to-es')
-  console.log('Ex: sql-to-es config http://localhost:9200 ../../models')
+  console.log('tube config [Elasticsearch server address] [Sequelize models folder path]')
+  console.log('Note: Models path is absolute from system root or relative from node_modules/tube')
+  console.log('Ex: tube config http://localhost:9200 ../../models')
   console.log('You can also override the default ES index, "app_index":')
-  console.log('sql-to-es config -i [new index name]')
+  console.log('tube config -i [new index name]')
   console.log('\nIndex Command')
-  console.log('sql-to-es index [optional: specific model names to index space-separated]')
-  console.log('Ex: sql-to-es index Facility Resource')
+  console.log('tube index [optional: specific model names to index space-separated]')
+  console.log('Ex: tube index Facility Resource')
   console.log('Note: Typing no specific models will index all models')
-  console.log('Ex: sql-to-es index')
+  console.log('Ex: tube index')
   console.log('\nFinal note: "c" and "i" can be used instead of "config" and "index"')
   console.log('\nHave fun!')
 }
