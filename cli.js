@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-const tube = require('./index')
+const ModelTube = require('./index')
+let tube = new ModelTube()
 
 if (process.argv.length > 2) { // CLI will have a third arg
   const args = process.argv.slice(2) // First two args are "node" and [filename]

@@ -7,11 +7,14 @@ class ModelTube {
     this.settingsPath = null
     this.settings = null
     this.esClient = null
-    this.models = null
+    this.modelNames = null
+    this.modelObjects = null
 
     this.setup = this.setup.bind(this)
     this.config = this.config.bind(this)
     this.index = this.index.bind(this)
+    this.standardEsQuery = this.standardEsQuery.bind(this)
+    this.testHooks = this.testHooks.bind(this)
 
     this.setup()
   }
@@ -31,15 +34,54 @@ class ModelTube {
       return
     }
     try {
-      // Last 2 items are Sequelize boilerplate
-      this.models = Object.keys(require(this.settings.models_path)).slice(0, -2)
-      this.models.forEach(name => {
-        const model = require(this.settings.models_path)[name]
-        model.hook('afterSave', (_model, options) => {
-          console.log('Save hook fired')
+      this.modelObjects = require(this.settings.models_path)
+      this.modelNames = Object.keys(this.modelObjects).slice(0, -2) // Last 2 items are Sequelize boilerplate
+      this.modelNames.forEach(name => {
+        const model = this.modelObjects[name]
+        model.hook('afterSave', async (_model, options) => {
+          const esQuery = this.standardEsQuery(name, _model.id)
+          console.log(esQuery)
+          let exists = null
+          try {
+            exists = await this.esClient.exists(esQuery)
+          } catch (error) {
+            console.log('\nError checking if model doc exists in ES\n')
+            console.log(error)
+          }
+          console.log('\nResult exists?: ' + exists + '\n')
+
+          if (exists) {
+            try {
+              const esUpdateQuery = Object.assign(
+                esQuery,
+                { body: { doc: { _model } } }
+              )
+              await this.esClient.update(esUpdateQuery)
+            } catch (error) {
+              console.log('\nError updating ES doc in save hook\n')
+              console.log(error)
+            }
+          } else if (exists === false) { // Might be null
+            try {
+              const esCreateQuery = Object.assign(
+                esQuery,
+                { body: _model }
+              )
+              await this.esClient.create(esCreateQuery)
+            } catch (error) {
+              console.log('\nError creating ES doc in save hook\n')
+              console.log(error)
+            }
+          }
         })
-        model.hook('afterDestroy', (_model, options) => {
-          console.log('Destroy hook fired')
+        model.hook('afterDestroy', async (_model, options) => {
+          const esQuery = this.standardEsQuery(name, _model.id)
+          try {
+            await this.esClient.delete(esQuery)
+          } catch (error) {
+            console.log('\nError with destroy hook\n')
+            console.log(error)
+          }
         })
       })
     } catch (error) {
@@ -72,7 +114,7 @@ class ModelTube {
         index: this.settings.es_index
       })
     } catch (error) {
-      console.log('\nIssue deleting index\n')
+      console.log('\nIssue creating index\n')
       console.log(error)
       return
     }
@@ -82,11 +124,10 @@ class ModelTube {
 
     toIndex = modelArgs && modelArgs.length > 0
       ? modelArgs
-      : this.models
+      : this.modelNames
 
     toIndex.forEach(async name => {
-      const model = this.models[name]
-
+      const model = this.modelObjects[name]
       try {
         const modelInstances = await model.findAll()
         let data = []
@@ -101,7 +142,6 @@ class ModelTube {
           })
           data.push(item.dataValues)
         })
-
         const response = await this.esClient.bulk({ body: data })
 
         let errorCount = 0
@@ -111,8 +151,7 @@ class ModelTube {
         const numItems = data.length / 2 // Divide by 2 b/c pushed two objects for each single model in bulk
         console.log(`\nIndexed ${numItems - errorCount}/${numItems} ${name} items`)
       } catch (error) {
-        console.log(`\nIssue with ${name} model`)
-        console.log('Hit ctrl-c if frozen\n')
+        console.log(`\nIssue with ${name} model\n`)
         console.log(error)
       }
       console.log(`${++completeCount}/${toIndex.length} total models complete`) // Note, increment takes place inline
@@ -137,18 +176,29 @@ class ModelTube {
     console.log('\nHave fun!')
   }
 
+  standardEsQuery (name, id) {
+    return {
+      index: this.settings.es_index,
+      type: name.toLowerCase(),
+      id: id
+    }
+  }
+
   async testHooks () {
-    const Order = this.models['Order']
+    const Order = this.modelObjects['Order']
     await Order.create({
-      id: 17,
+      id: 51,
       submittingUserId: 1,
       request: '{ "good day": "tortoise" }',
       createdAt: new Date(),
       updatedAt: new Date()})
-    let testOrder = await Order.findById(17)
+    console.log('\nSequelize Created\n')
+    let testOrder = await Order.findById(51)
     testOrder.request = '{ "good day": "pinata" }'
     await testOrder.save()
-    testOrder.destroy()
+    console.log('\nSequelize Saved\n')
+    await testOrder.destroy()
+    console.log('\nSequelize Destroyed\n')
   }
 }
-exports.default = ModelTube
+module.exports = ModelTube
