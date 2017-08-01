@@ -7,11 +7,13 @@ class ModelTube {
     this.settingsPath = null
     this.settings = null
     this.esClient = null
-    this.models = null
+    this.modelNames = null
+    this.modelObjects = null
 
     this.setup = this.setup.bind(this)
     this.config = this.config.bind(this)
     this.index = this.index.bind(this)
+    this.testHooks = this.testHooks.bind(this)
 
     this.setup()
   }
@@ -32,9 +34,10 @@ class ModelTube {
     }
     try {
       // Last 2 items are Sequelize boilerplate
-      this.models = Object.keys(require(this.settings.models_path)).slice(0, -2)
-      this.models.forEach(name => {
-        const model = require(this.settings.models_path)[name]
+      this.modelObjects = require(this.settings.models_path)
+      this.modelNames = Object.keys(this.modelObjects).slice(0, -2)
+      this.modelNames.forEach(name => {
+        const model = this.modelObjects[name]
         model.hook('afterSave', (_model, options) => {
           console.log('Save hook fired')
         })
@@ -82,13 +85,16 @@ class ModelTube {
 
     toIndex = modelArgs && modelArgs.length > 0
       ? modelArgs
-      : this.models
+      : this.modelNames
 
+      console.log("\ntoIndex\n" + toIndex)
     toIndex.forEach(async name => {
-      const model = this.models[name]
-
+      console.log("\nname\n" + name)
+      const model = this.modelObjects[name]
+      console.log("\nmodel\n" + model)
       try {
         const modelInstances = await model.findAll()
+        console.log("\nmodelInstances\n" + modelInstances)
         let data = []
         modelInstances.forEach(item => { // 2 JSON objects must be pushed for each model w/ ES bulk
           data.push({
@@ -101,7 +107,7 @@ class ModelTube {
           })
           data.push(item.dataValues)
         })
-
+        console.log("\ndata\n" + data)
         const response = await this.esClient.bulk({ body: data })
 
         let errorCount = 0
@@ -111,8 +117,7 @@ class ModelTube {
         const numItems = data.length / 2 // Divide by 2 b/c pushed two objects for each single model in bulk
         console.log(`\nIndexed ${numItems - errorCount}/${numItems} ${name} items`)
       } catch (error) {
-        console.log(`\nIssue with ${name} model`)
-        console.log('Hit ctrl-c if frozen\n')
+        console.log(`\nIssue with ${name} model\n`)
         console.log(error)
       }
       console.log(`${++completeCount}/${toIndex.length} total models complete`) // Note, increment takes place inline
@@ -138,7 +143,7 @@ class ModelTube {
   }
 
   async testHooks () {
-    const Order = this.models['Order']
+    const Order = this.modelObjects['Order']
     await Order.create({
       id: 17,
       submittingUserId: 1,
@@ -151,4 +156,4 @@ class ModelTube {
     testOrder.destroy()
   }
 }
-exports.default = ModelTube
+module.exports = ModelTube
