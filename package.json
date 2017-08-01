@@ -2,7 +2,7 @@
   "name": "model-tube",
   "version": "1.0.0",
   "description": "Index Sequelize models as Elasticsearch documents.",
-  "bin": "./index.js",
+  "bin": { "tube" : "./cli.js" },
   "author": "Nicholas Hartunian",
   "license": "MIT",
   "devDependencies": {
