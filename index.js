@@ -29,12 +29,8 @@ const setup = () => {
     const toHook = Object.keys(require(settings.models_path)).slice(0, -2)
     toHook.forEach(name => {
       const model = require(settings.models_path)[name]
-      // Upsert hook wasn't working (create or update)
-      model.hook('afterCreate', (_model, options) => {
-        console.log('Create hook fired')
-      })
-      model.hook('afterUpdate', (_model, options) => {
-        console.log('Update hook fired')
+      model.hook('afterSave', (_model, options) => {
+        console.log('Save hook fired')
       })
       model.hook('afterDestroy', (_model, options) => {
         console.log('Destroy hook fired')
@@ -124,19 +120,15 @@ const index = async models => {
 
 const testHooks = async () => {
   const Order = require(settings.models_path)['Order']
-  console.log('Creating')
   await Order.create({
     id: 17,
     submittingUserId: 1,
     request: '{ "good day": "tortoise" }',
     createdAt: new Date(),
     updatedAt: new Date()})
-  console.log('Modifying')
   let testOrder = await Order.findById(17)
-  console.log(JSON.stringify(testOrder))
   testOrder.request = '{ "good day": "pinata" }'
-  console.log(JSON.stringify(testOrder))
-  console.log('Destroying')
+  await testOrder.save()
   testOrder.destroy()
 }
 
