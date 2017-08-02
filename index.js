@@ -14,7 +14,7 @@ class ModelTube {
     this.config = this.config.bind(this)
     this.index = this.index.bind(this)
     this.standardEsQuery = this.standardEsQuery.bind(this)
-    this.testHooks = this.testHooks.bind(this)
+    this.testHooks = this.testHooks.bind(this) // TODO: Remove in final release
 
     this.setup()
   }
@@ -30,8 +30,7 @@ class ModelTube {
     } catch (error) {
       console.log('\nPlease configure settings')
       console.log('tube config [Elasticsearch server address] [Sequelize models folder path]\n')
-      console.log(error)
-      return
+      throw error
     }
     try {
       this.modelObjects = require(this.settings.models_path)
@@ -48,13 +47,12 @@ class ModelTube {
             console.log('\nError checking if model doc exists in ES\n')
             console.log(error)
           }
-          console.log('\nResult exists?: ' + exists + '\n')
 
           if (exists) {
             try {
               const esUpdateQuery = Object.assign(
                 esQuery,
-                { body: { doc: { _model } } }
+                { body: { doc: { _model } } } // Update syntax: doc replaces
               )
               await this.esClient.update(esUpdateQuery)
             } catch (error) {
@@ -114,9 +112,8 @@ class ModelTube {
         index: this.settings.es_index
       })
     } catch (error) {
-      console.log('\nIssue creating index\n')
-      console.log(error)
-      return
+      console.log('\nIssue creating index ' + this.settings.ex_index + '\n')
+      throw error
     }
 
     let toIndex = []
@@ -133,7 +130,6 @@ class ModelTube {
         let data = []
         modelInstances.forEach(item => { // 2 JSON objects must be pushed for each model w/ ES bulk
           data.push({
-            // Searching many indices w/ 1 type each has same performance as 1 index w/ many types
             index: {
               _index: this.settings.es_index,
               _type: name.toLowerCase(), // Lowercase required by ES
@@ -159,21 +155,51 @@ class ModelTube {
     })
   }
 
-  printUsage () {
-    console.log('Usage:')
-    console.log('\nConfiguration Command')
-    console.log('tube config [Elasticsearch server address] [Sequelize models folder path]')
-    console.log('Note: Models path is absolute from system root or relative from node_modules/tube')
-    console.log('Ex: tube config http://localhost:9200 ../../models')
-    console.log('You can also override the default ES index, "app_index":')
-    console.log('tube config -i [new index name]')
-    console.log('\nIndex Command')
-    console.log('tube index [optional: specific model names to index space-separated]')
-    console.log('Ex: tube index Facility Resource')
-    console.log('Note: Typing no specific models will index all models')
-    console.log('Ex: tube index')
-    console.log('\nFinal note: "c" and "i" can be used instead of "config" and "index"')
-    console.log('\nHave fun!')
+  async simpleSearch (searchTerm, propertyToSearch) {
+    propertyToSearch = propertyToSearch || '_all' // If not property to search provided, search all fields
+    try {
+      const results = await this.esClient.search({
+        index: this.settings.es_index,
+        q: propertyToSearch + ':' + searchTerm
+      })
+      return results.hits.hits
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  async fuzzySearch (searchTerm, modelName, propertyToSearch) {
+    let searchQuery = {
+      index: 'app_index',
+      body: {
+        query: {
+          match: {}
+        }
+      }
+    }
+    propertyToSearch = propertyToSearch || '_all'
+    searchQuery.body.query.match[propertyToSearch] = {
+      query: searchTerm, // Set inner fuzzy query to search term
+      fuzziness: 'AUTO'
+    }
+    if (modelName) { // If no model to search provided (type), search all models
+      searchQuery['type'] = modelName.toLowerCase()
+    }
+    try {
+      const results = await this.esClient.search(searchQuery)
+      return results.hits.hits
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  async rawQuery (queryJSON) {
+    try {
+      const results = await this.esClient.search(queryJSON)
+      return results.hits.hits
+    } catch (error) {
+      console.log(error)
+    }
   }
 
   standardEsQuery (name, id) {
@@ -184,7 +210,7 @@ class ModelTube {
     }
   }
 
-  async testHooks () {
+  async testHooks () { // TODO: Remove in official release
     const Order = this.modelObjects['Order']
     await Order.create({
       id: 51,
@@ -201,4 +227,4 @@ class ModelTube {
     console.log('\nSequelize Destroyed\n')
   }
 }
-module.exports = ModelTube
+module.exports = new ModelTube()

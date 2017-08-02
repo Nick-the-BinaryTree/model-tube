@@ -5,7 +5,7 @@
   "bin": { "tube" : "./cli.js" },
   "author": "Nicholas Hartunian",
   "license": "MIT",
-  "devDependencies": {
+  "dependencies": {
     "elasticsearch": "^13.2.0"
   }
 }
