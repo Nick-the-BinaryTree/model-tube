@@ -66,13 +66,17 @@ Notes:
 ## "In-Code" Usage
 If you want to use the `tube index command` in your code, you can import it as follows:
 
-`const tube = require(tube)`
+`const tube = require('model-tube')()`
 
 If the default settings in `settings.json` are not to your liking, you can configure them on the import with:
 
-`const tube = require(tube).config({es_host: YOUR_SERVER, es_index: YOUR_INDEX, models_path: YOUR_PATH})`
+`const tube = require('model-tube')({es_host: YOUR_SERVER, es_index: YOUR_INDEX, models_path: YOUR_PATH})`
 
 Note: You only have to enter the JSON keys for settings you want to override. For instance, you could leave out `es_index` to keep the default `app_index`.
+
+To update the settings anywhere in the code, run:
+
+`tube.updateConfig({es_host: YOUR_SERVER, es_index: YOUR_INDEX, models_path: YOUR_PATH})`
 
 To index all models, just add this line:
 
@@ -86,7 +90,7 @@ Use the search features similarly to their CLI format:
 
 `tube.simpleSearch([search term], [optional: property])`
 `tube.fuzzySearch([search term], [optional: model name], [optional: property])`
-`tube.rawQuery({[query json]})`
+`tube.rawQuery({query json})`
 
 ## About
 This package was developed by Nicholas Hartunian for UConn's Squared Labs. Shout-out to Brandon Cheng for much appreciated advice.

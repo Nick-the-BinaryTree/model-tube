@@ -3,103 +3,112 @@ const fs = require('fs')
 const pathToHere = require('path')
 
 class ModelTube {
-  constructor () {
-    this.settingsPath = null
-    this.settings = null
-    this.esClient = null
-    this.modelNames = null
-    this.modelObjects = null
+  constructor (initSettings) {
+    this.settingsPath = pathToHere.join(__dirname, '/settings.json')
+    this.settings = require(this.settingsPath)
 
-    this.setup = this.setup.bind(this)
-    this.config = this.config.bind(this)
+    this.initConfig = this.initConfig.bind(this)
+    this.updateConfig = this.updateConfig.bind(this)
+    this.setEsClient = this.setEsClient.bind(this)
+    this.setModels = this.setModels.bind(this)
+    this.setHooks = this.setHooks.bind(this)
     this.index = this.index.bind(this)
     this.standardEsQuery = this.standardEsQuery.bind(this)
-    this.testHooks = this.testHooks.bind(this) // TODO: Remove in final release
 
-    this.setup()
+    if (initSettings) {
+      this.initConfig(initSettings)
+    }
+    this.setEsClient()
+    this.setModels()
+    this.setHooks()
   }
 
-  setup () {
-    this.settingsPath = pathToHere.join(__dirname, '/settings.json')
-    try {
-      this.settings = require(this.settingsPath)
-      this.esClient = new elasticsearch.Client({
-        host: this.settings.es_host,
-        log: 'error'
-      })
-    } catch (error) {
-      console.log('\nPlease configure settings')
-      console.log('tube config [Elasticsearch server address] [Sequelize models folder path]\n')
-      throw error
-    }
-    try {
-      this.modelObjects = require(this.settings.models_path)
-      this.modelNames = Object.keys(this.modelObjects).slice(0, -2) // Last 2 items are Sequelize boilerplate
-      this.modelNames.forEach(name => {
-        const model = this.modelObjects[name]
-        model.hook('afterSave', async (_model, options) => {
-          const esQuery = this.standardEsQuery(name, _model.id)
-          console.log(esQuery)
-          let exists = null
-          try {
-            exists = await this.esClient.exists(esQuery)
-          } catch (error) {
-            console.log('\nError checking if model doc exists in ES\n')
-            console.log(error)
-          }
-
-          if (exists) {
-            try {
-              const esUpdateQuery = Object.assign(
-                esQuery,
-                { body: { doc: { _model } } } // Update syntax: doc replaces
-              )
-              await this.esClient.update(esUpdateQuery)
-            } catch (error) {
-              console.log('\nError updating ES doc in save hook\n')
-              console.log(error)
-            }
-          } else if (exists === false) { // Might be null
-            try {
-              const esCreateQuery = Object.assign(
-                esQuery,
-                { body: _model }
-              )
-              await this.esClient.create(esCreateQuery)
-            } catch (error) {
-              console.log('\nError creating ES doc in save hook\n')
-              console.log(error)
-            }
-          }
-        })
-        model.hook('afterDestroy', async (_model, options) => {
-          const esQuery = this.standardEsQuery(name, _model.id)
-          try {
-            await this.esClient.delete(esQuery)
-          } catch (error) {
-            console.log('\nError with destroy hook\n')
-            console.log(error)
-          }
-        })
-      })
-    } catch (error) {
-      console.log('\nError setting up Sequelize hooks\n')
-      console.log(error)
-    }
-  }
-
-  config (newSettings) {
-    this.settings.es_host = newSettings.es_host || this.settings.es_host // Copy over new relevant settings or keep old
+  initConfig (newSettings) {
+    this.settings.es_host = newSettings.es_host || this.settings.es_host
     this.settings.models_path = newSettings.models_path || this.settings.models_path
     this.settings.es_index = newSettings.es_index || this.settings.es_index
-    fs.writeFile(this.settingsPath, JSON.stringify(this.settings), () => {
-      console.log('Configuration updated. Very nice.')
+    fs.writeFile(this.settingsPath, JSON.stringify(this.settings))
+  }
+
+  updateConfig (newSettings) {
+    if (newSettings.es_host) {
+      this.settings.es_host = newSettings.es_host
+      this.setEsClient()
+    }
+    if (newSettings.models_path) {
+      this.settings.models_path = newSettings.models_path
+      this.setModels()
+    }
+    if (newSettings.es_index) {
+      this.settings.es_index = newSettings.es_index
+      this.setHooks()
+    }
+    fs.writeFile(this.settingsPath, JSON.stringify(this.settings))
+  }
+
+  setEsClient () {
+    this.esClient = new elasticsearch.Client({
+      host: this.settings.es_host,
+      log: 'error'
+    })
+  }
+
+  setModels () {
+    let db = require(this.settings.models_path)
+    this.sequelize = db.sequelize // Instance of Sequelize
+    this.Sequelize = db.Sequelize // Sequelize Class
+    this.models = {}
+    Object.keys(db).forEach(name => { // Delete syntax unfortunately deletes for test too, so we pseudo-filter
+      if (name !== 'sequelize' && name !== 'Sequelize') {
+        this.models[name] = db[name]
+      }
+    })
+  }
+
+  setHooks () {
+    Object.keys(this.models).forEach(name => { // Iterate over keys array (model names)
+      const model = this.models[name]          // b/c can't iterate over object easily
+      model.hook('afterSave', async (modelRecord, options) => {
+        const esQuery = this.standardEsQuery(name, modelRecord.id)
+        const exists = await this.esClient.exists(esQuery)
+        if (exists) {
+          try {
+            const esUpdateQuery = Object.assign(
+              esQuery,
+              { body: { doc: { modelRecord } } } // Update syntax: doc replaces
+            )
+            await this.esClient.update(esUpdateQuery)
+          } catch (error) {
+            console.log('\nError updating ES doc in save hook\n')
+            throw error
+          }
+        } else {
+          try {
+            const esCreateQuery = Object.assign(
+              esQuery,
+              { body: modelRecord }
+            )
+            await this.esClient.create(esCreateQuery)
+          } catch (error) {
+            console.log('\nError creating ES doc in save hook\n')
+            throw error
+          }
+        }
+      })
+      model.hook('afterDestroy', async (modelRecord, options) => {
+        const esQuery = this.standardEsQuery(name, modelRecord.id)
+        try {
+          await this.esClient.delete(esQuery)
+        } catch (error) {
+          console.log('\nError with destroy hook\n')
+          throw error
+        }
+      })
     })
   }
 
   async index (modelArgs) {
     try {
-      // If no awaits, these will run out of order
       await this.esClient.indices.delete({ // Wipe current values
         index: this.settings.es_index
       })
@@ -121,10 +130,10 @@ class ModelTube {
 
     toIndex = modelArgs && modelArgs.length > 0
       ? modelArgs
-      : this.modelNames
+      : Object.keys(this.models)
 
     toIndex.forEach(async name => {
-      const model = this.modelObjects[name]
+      const model = this.models[name]
       try {
         const modelInstances = await model.findAll()
         let data = []
@@ -157,15 +166,11 @@ class ModelTube {
 
   async simpleSearch (searchTerm, propertyToSearch) {
     propertyToSearch = propertyToSearch || '_all' // If not property to search provided, search all fields
-    try {
-      const results = await this.esClient.search({
-        index: this.settings.es_index,
-        q: propertyToSearch + ':' + searchTerm
-      })
-      return results.hits.hits
-    } catch (error) {
-      console.log(error)
-    }
+    const results = await this.esClient.search({
+      index: this.settings.es_index,
+      q: propertyToSearch + ':' + searchTerm
+    })
+    return results.hits.hits
   }
 
   async fuzzySearch (searchTerm, modelName, propertyToSearch) {
@@ -185,21 +190,13 @@ class ModelTube {
     if (modelName) { // If no model to search provided (type), search all models
       searchQuery['type'] = modelName.toLowerCase()
     }
-    try {
-      const results = await this.esClient.search(searchQuery)
-      return results.hits.hits
-    } catch (error) {
-      console.log(error)
-    }
+    const results = await this.esClient.search(searchQuery)
+    return results.hits.hits
   }
 
   async rawQuery (queryJSON) {
-    try {
-      const results = await this.esClient.search(queryJSON)
-      return results.hits.hits
-    } catch (error) {
-      console.log(error)
-    }
+    const results = await this.esClient.search(queryJSON)
+    return results.hits.hits
   }
 
   standardEsQuery (name, id) {
@@ -209,22 +206,6 @@ class ModelTube {
       id: id
     }
   }
-
-  async testHooks () { // TODO: Remove in official release
-    const Order = this.modelObjects['Order']
-    await Order.create({
-      id: 51,
-      submittingUserId: 1,
-      request: '{ "good day": "tortoise" }',
-      createdAt: new Date(),
-      updatedAt: new Date()})
-    console.log('\nSequelize Created\n')
-    let testOrder = await Order.findById(51)
-    testOrder.request = '{ "good day": "pinata" }'
-    await testOrder.save()
-    console.log('\nSequelize Saved\n')
-    await testOrder.destroy()
-    console.log('\nSequelize Destroyed\n')
-  }
 }
-module.exports = new ModelTube()
+
+module.exports = initSettings => new ModelTube(initSettings)

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const tube = require('./index')
+const tube = require('./index')()
 
 const printConfigUsage = () => {
   console.log('\nConfiguration Command')
@@ -43,32 +43,27 @@ const printUsage = () => {
 }
 
 const commands = async () => {
-  if (process.argv.length > 2) { // CLI will have a third arg
-    const args = process.argv.slice(2) // First two args are "node" and [filename]
-
-    if (args.length > 0) {
-      if ((args[0] === 'config' || args[0] === 'c') && args.length >= 2) {
-        if (args[1] === '-i') {
-          tube.config({es_index: args[2]})
-        } else {
-          tube.config({es_host: args[1], models_path: args[2]})
-        }
-      } else if (args[0] === 'index' || args[0] === 'i') {
-        tube.index(args.slice(1))
-      } else if (args[0] === 'simpleSearch' || args[0] === 'search' || args[0] === 'ss') {
-        console.log(await tube.simpleSearch(...args.slice(1)))
-      } else if (args[0] === 'fuzzySearch' || args[0] === 'fs') {
-        console.log(await tube.fuzzySearch(...args.slice(1)))
-      } else if (args[0] === 'help' && args.length > 1 && args[1] === 'search') {
-        printSearchUsage()
-      } else if (args[0] === 'testHooks') {
-        tube.testHooks()
-      } else {
-        printUsage()
-      }
+  if (process.argv.length <= 2) { // CLI will have a third arg
+    printUsage()
+    return
+  }
+  const [command, ...args] = process.argv.slice(2) // First two args are "node" and [filename]
+  if ((command === 'config' || command === 'c') && args.length >= 1) {
+    if (args[0] === '-i') {
+      tube.updateConfig({es_index: args[1]})
     } else {
-      printUsage()
+      tube.updateConfig({es_host: args[0], models_path: args[1]})
     }
+  } else if (command === 'index' || command === 'i') {
+    tube.index(args)
+  } else if (command === 'simpleSearch' || command === 'search' || command === 'ss') {
+    console.log(await tube.simpleSearch(...args))
+  } else if (command === 'fuzzySearch' || command === 'fs') {
+    console.log(await tube.fuzzySearch(...args))
+  } else if (command === 'help' && args && args[0] === 'search') {
+    printSearchUsage()
+  } else {
+    printUsage()
   }
 }
 
