@@ -1,0 +1,14 @@
+version: "3"
+
+services:
+
+  # On Linux, files created by a service on a host mapped volume are owned by
+  # root. Changing the default user id resolves this issue.
+  #
+  # OS X and Windows are unaffected when using their hypervisor frameworks.
+
+  mysql:
+    user: $UID
+
+  elasticsearch:
+    user: $UID

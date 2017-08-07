@@ -1,0 +1,45 @@
+version: "3"
+
+services:
+
+  mysql:
+    image: mysql
+    volumes:
+      - ./docker/mysql/data:/var/lib/mysql
+      - ./docker/mysql/config:/etc/mysql/conf.d
+      - ./docker/mysql/log:/var/log/mysql
+    expose:
+      - "3306"
+    environment:
+      MYSQL_DATABASE: docker
+      MYSQL_USER: docker
+      MYSQL_PASSWORD: secret
+      MYSQL_ROOT_PASSWORD: root
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:5.5.0
+    volumes:
+      - ./docker/elasticsearch/data:/usr/share/elasticsearch/data
+      - ./docker/elasticsearch/logs:/usr/share/elasticsearch/logs
+    expose:
+      - "9200"
+    environment:
+      - xpack.security.enabled=false
+      - xpack.monitoring.enabled=false
+
+  workspace:
+    build: ./docker/workspace
+    # command: npm start
+    volumes:
+      - ./:/var/www/html
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    environment:
+      DB_DIALECT: mysql
+      DB_HOST: mysql
+      DB_NAME: docker
+      DB_USER: docker
+      DB_PASS: secret
+      ELASTICSEARCH_HOST: elasticsearch:9200
+      LISTEN: 3000
