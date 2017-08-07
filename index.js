@@ -1,11 +1,12 @@
 const elasticsearch = require('elasticsearch')
-const fs = require('fs')
-const pathToHere = require('path')
 
 class ModelTube {
   constructor (initSettings) {
-    this.settingsPath = pathToHere.join(__dirname, '/settings.json')
-    this.settings = require(this.settingsPath)
+    this.settings = { // Defaults
+      'es_host': 'http://localhost:9200',
+      'es_index': 'app_index',
+      'models_path': '../../models'
+    }
 
     this.initConfig = this.initConfig.bind(this)
     this.updateConfig = this.updateConfig.bind(this)
@@ -27,7 +28,6 @@ class ModelTube {
     this.settings.es_host = newSettings.es_host || this.settings.es_host
     this.settings.models_path = newSettings.models_path || this.settings.models_path
     this.settings.es_index = newSettings.es_index || this.settings.es_index
-    fs.writeFile(this.settingsPath, JSON.stringify(this.settings))
   }
 
   updateConfig (newSettings) {
@@ -43,7 +43,6 @@ class ModelTube {
       this.settings.es_index = newSettings.es_index
       this.setHooks()
     }
-    fs.writeFile(this.settingsPath, JSON.stringify(this.settings))
   }
 
   setEsClient () {

@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 
-const tube = require('./index')()
+const path = require('path')
+const fs = require('fs')
+const settingsPath = path.join(__dirname, '/settings.json')
+
+// Since this file is reloaded on each command, we read and wrtie settings to a file
+const tube = require('./index')(require(settingsPath))
 
 const printConfigUsage = () => {
   console.log('\nConfiguration Command')
@@ -43,7 +48,7 @@ const printUsage = () => {
 }
 
 const commands = async () => {
-  if (process.argv.length <= 2) { // CLI will have a third arg
+  if (process.argv.length <= 2) {
     printUsage()
     return
   }
@@ -54,6 +59,7 @@ const commands = async () => {
     } else {
       tube.updateConfig({es_host: args[0], models_path: args[1]})
     }
+    fs.writeFile(settingsPath, JSON.stringify(tube.settings))
   } else if (command === 'index' || command === 'i') {
     tube.index(args)
   } else if (command === 'simpleSearch' || command === 'search' || command === 'ss') {
