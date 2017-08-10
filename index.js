@@ -1,48 +1,90 @@
 const elasticsearch = require('elasticsearch')
 
+const arrayToObject = (arr) => { // Simple object from array for O(1) lookup
+  let res = {}
+  arr.forEach(item => {
+    res[item] = true
+  })
+  return res
+}
+
 class ModelTube {
   constructor (initSettings) {
     this.settings = { // Defaults
       'es_host': 'http://localhost:9200',
       'es_index': 'app_index',
-      'models_path': '../../models'
+      'models_path': '../../models',
+      'whitelist': {},
+      'blacklist': {}
     }
 
-    this.initConfig = this.initConfig.bind(this)
-    this.updateConfig = this.updateConfig.bind(this)
+    this.config = this.config.bind(this)
+    this.updateWhiteOrBlackList = this.updateWhiteOrBlackList.bind(this)
     this.setEsClient = this.setEsClient.bind(this)
     this.setModels = this.setModels.bind(this)
     this.setHooks = this.setHooks.bind(this)
+    this.removeHooks = this.removeHooks.bind(this)
     this.index = this.index.bind(this)
     this.standardEsQuery = this.standardEsQuery.bind(this)
 
-    if (initSettings) {
-      this.initConfig(initSettings)
-    }
-    this.setEsClient()
-    this.setModels()
-    this.setHooks()
+    Object.keys(initSettings).forEach(changedSetting => (
+      this.settings[changedSetting] = initSettings[changedSetting]
+    ))
+    this.config(this.settings)
   }
 
-  initConfig (newSettings) {
-    this.settings.es_host = newSettings.es_host || this.settings.es_host
-    this.settings.models_path = newSettings.models_path || this.settings.models_path
-    this.settings.es_index = newSettings.es_index || this.settings.es_index
-  }
-
-  updateConfig (newSettings) {
-    if (newSettings.es_host) {
-      this.settings.es_host = newSettings.es_host
+  config (settings) { // Can initialize or update settings
+    if (settings.es_host) {
+      this.settings.es_host = settings.es_host
       this.setEsClient()
     }
-    if (newSettings.models_path) {
-      this.settings.models_path = newSettings.models_path
+    console.log("After setting in config")
+    console.log(this.esClient)
+    const changedList = this.updateWhiteOrBlackList(settings)
+    this.settings.models_path = settings.models_path || this.settings.models_path
+    this.settings.es_index = settings.es_index || this.settings.es_index
+    if (settings.models_path || settings.es_index || changedList) {
       this.setModels()
-    }
-    if (newSettings.es_index) {
-      this.settings.es_index = newSettings.es_index
+      this.removeHooks()
       this.setHooks()
+      this.index()
     }
+  }
+
+  updateWhiteOrBlackList (newSettings) {
+    let oldType = this.listType
+    let isWhite = newSettings.whitelist && Object.getOwnPropertyNames(newSettings.whitelist).length > 0
+    let isBlack = newSettings.blacklist && Object.getOwnPropertyNames(newSettings.blacklist).length > 0
+    if (isWhite && isBlack) {
+      throw Error('Cannot have both a whitelist and a blacklist')
+    } else if (isWhite) {
+      this.listType = 'white'
+    } else if (isBlack) {
+      this.listType = 'black'
+    } else {
+      this.listType = 'none'
+    }
+    if (this.listType === 'white') { // Would normally use set datatype, but that's not compatible with JSON
+      const newWhite = arrayToObject(newSettings.whitelist)
+      if (this.settings.whitelist === newWhite) {
+        return false
+      }
+      this.settings.whitelist = newWhite
+      this.settings.blacklist = {}
+      return true
+    } else if (this.listType === 'black') {
+      const newBlack = arrayToObject(newSettings.blacklist)
+      if (this.settings.blacklist === newBlack) {
+        return false
+      }
+      this.settings.whitelist = {}
+      this.settings.blacklist = newBlack
+      return true
+    } else {
+      this.settings.whitelist = {}
+      this.settings.blacklist = {}
+    }
+    return oldType === this.listType
   }
 
   setEsClient () {
@@ -50,31 +92,38 @@ class ModelTube {
       host: this.settings.es_host,
       log: 'error'
     })
+    console.log("After creating")
+    console.log(this.esClient)
   }
 
   setModels () {
-    let db = require(this.settings.models_path)
-    this.sequelize = db.sequelize // Instance of Sequelize
-    this.Sequelize = db.Sequelize // Sequelize Class
+    this.db = require(this.settings.models_path)
+    this.sequelize = this.db.sequelize // Instance of Sequelize
+    this.Sequelize = this.db.Sequelize // Sequelize Class
     this.models = {}
-    Object.keys(db).forEach(name => { // Delete syntax unfortunately deletes for test too, so we pseudo-filter
-      if (name !== 'sequelize' && name !== 'Sequelize') {
-        this.models[name] = db[name]
+    Object.keys(this.db).forEach(name => {
+      if ((name !== 'sequelize' && name !== 'Sequelize') &&
+          ((this.listType === 'white' && this.settings.whitelist[name]) ||
+           (this.listType === 'black' && !this.settings.blacklist[name]) ||
+           (this.listType === 'none'))) {
+        this.models[name] = this.db[name]
       }
     })
   }
 
   setHooks () {
+    console.log("Setting hooks, client is:")
+    console.log(this.esClient)
     Object.keys(this.models).forEach(name => { // Iterate over keys array (model names)
       const model = this.models[name]          // b/c can't iterate over object easily
-      model.hook('afterSave', async (modelRecord, options) => {
+      model.afterSave('modelSave', async (modelRecord, options) => {
         const esQuery = this.standardEsQuery(name, modelRecord.id)
         const exists = await this.esClient.exists(esQuery)
         if (exists) {
           try {
             const esUpdateQuery = Object.assign(
               esQuery,
-              { body: { doc: { modelRecord } } } // Update syntax: doc replaces
+              { body: { doc: { modelRecord } } } // ES update syntax: doc replaces
             )
             await this.esClient.update(esUpdateQuery)
           } catch (error) {
@@ -94,7 +143,7 @@ class ModelTube {
           }
         }
       })
-      model.hook('afterDestroy', async (modelRecord, options) => {
+      model.afterDestroy('modelDestroy', async (modelRecord, options) => {
         const esQuery = this.standardEsQuery(name, modelRecord.id)
         try {
           await this.esClient.delete(esQuery)
@@ -103,6 +152,15 @@ class ModelTube {
           throw error
         }
       })
+    })
+  }
+
+  removeHooks () {
+    Object.keys(this.db).forEach(name => { // Remove hooks from all models whether or not on a list
+      if (name !== 'sequelize' && name !== 'Sequelize') {
+        this.db[name].removeHook('afterSave', 'modelSave')
+        this.db[name].removeHook('afterDestroy', 'modelDestroy')
+      }
     })
   }
 
@@ -120,7 +178,7 @@ class ModelTube {
         index: this.settings.es_index
       })
     } catch (error) {
-      console.log('\nIssue creating index ' + this.settings.ex_index + '\n')
+      console.log('\nIssue creating index ' + this.settings.es_index + '\n')
       throw error
     }
 

@@ -14,6 +14,10 @@ const printConfigUsage = () => {
   console.log('Ex: tube config http://localhost:9200 ../../models')
   console.log('You can also override the default ES index, "app_index":')
   console.log('tube config -i [new index name]')
+  console.log('Or you can set a whitelist or blacklist of models to hook and index:')
+  console.log('tube config [-wl or -bl] [space-separated model names]')
+  console.log('Ex: tube config -wl Facility Resource')
+  console.log('Type "tube config" without any arguments to view current settings')
   console.log('Shortcut: "c" can be used instead of "config"\n')
 }
 
@@ -52,14 +56,21 @@ const commands = async () => {
     printUsage()
     return
   }
+  console.log(process.argv)
   const [command, ...args] = process.argv.slice(2) // First two args are "node" and [filename]
   if ((command === 'config' || command === 'c') && args.length >= 1) {
     if (args[0] === '-i') {
-      tube.updateConfig({es_index: args[1]})
+      tube.config({es_index: args[1]})
+    } else if (args[0] === '-wl') {
+      tube.config({whitelist: args.slice(1)})
+    } else if (args[0] === '-bl') {
+      tube.config({blacklist: args.slice(1)})
     } else {
-      tube.updateConfig({es_host: args[0], models_path: args[1]})
+      tube.config({es_host: args[0], models_path: args[1]})
     }
     fs.writeFile(settingsPath, JSON.stringify(tube.settings))
+  } else if (command === 'config' || command === 'c') {
+    console.log(tube.settings)
   } else if (command === 'index' || command === 'i') {
     tube.index(args)
   } else if (command === 'simpleSearch' || command === 'search' || command === 'ss') {
