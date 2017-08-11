@@ -1,2 +1,3 @@
 # Prevent modules from being saved across build environments.
 node_modules
+__tests__

@@ -7,8 +7,5 @@ services:
   #
   # OS X and Windows are unaffected when using their hypervisor frameworks.
 
-  mysql:
-    user: $UID
-
   elasticsearch:
     user: $UID

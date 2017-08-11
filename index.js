@@ -27,9 +27,11 @@ class ModelTube {
     this.index = this.index.bind(this)
     this.standardEsQuery = this.standardEsQuery.bind(this)
 
-    Object.keys(initSettings).forEach(changedSetting => (
-      this.settings[changedSetting] = initSettings[changedSetting]
-    ))
+    if (initSettings) {
+      Object.keys(initSettings).forEach(changedSetting => (
+        this.settings[changedSetting] = initSettings[changedSetting]
+      ))
+    }
     this.config(this.settings)
   }
 
@@ -38,8 +40,6 @@ class ModelTube {
       this.settings.es_host = settings.es_host
       this.setEsClient()
     }
-    console.log("After setting in config")
-    console.log(this.esClient)
     const changedList = this.updateWhiteOrBlackList(settings)
     this.settings.models_path = settings.models_path || this.settings.models_path
     this.settings.es_index = settings.es_index || this.settings.es_index
@@ -92,8 +92,6 @@ class ModelTube {
       host: this.settings.es_host,
       log: 'error'
     })
-    console.log("After creating")
-    console.log(this.esClient)
   }
 
   setModels () {
@@ -112,8 +110,6 @@ class ModelTube {
   }
 
   setHooks () {
-    console.log("Setting hooks, client is:")
-    console.log(this.esClient)
     Object.keys(this.models).forEach(name => { // Iterate over keys array (model names)
       const model = this.models[name]          // b/c can't iterate over object easily
       model.afterSave('modelSave', async (modelRecord, options) => {

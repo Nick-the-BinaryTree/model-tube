@@ -17,9 +17,6 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     nodejs
 
-# Install MySQL tools
-RUN apt-get update && apt-get install -y mysql-client
-
 # Install git
 Run apt-get update && apt-get install -y git
 
@@ -30,11 +27,6 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Custom instructions to setup a local non-root user
 RUN useradd -ms /bin/bash docker
-
-# Make using the mysql command line utility a little easier by supplying default
-# passwords
-COPY .my.cnf /home/docker/
-RUN chown docker /home/docker/.my.cnf
 
 WORKDIR /var/www/html
 
