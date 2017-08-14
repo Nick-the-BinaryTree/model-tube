@@ -30,6 +30,12 @@ const printIndexUsage = () => {
   console.log('Shortcut: "i" can be used instead of "index"\n')
 }
 
+const printResetUsage = () => {
+  console.log('\nReset Command')
+  console.log('tube reset')
+  console.log('Wipes Elasticsearch index in settings (careful!)')
+}
+
 const printSearchUsage = () => {
   console.log('\nSearch Commands')
   console.log('\nThree ways to simple search all models')
@@ -48,6 +54,7 @@ const printSearchUsage = () => {
 const printUsage = () => {
   printConfigUsage()
   printIndexUsage()
+  printResetUsage()
   console.log('\nTo learn about searching, type: tube help search')
 }
 
@@ -73,6 +80,8 @@ const commands = async () => {
     console.log(tube.settings)
   } else if (command === 'index' || command === 'i') {
     tube.index(args)
+  } else if (command === 'reset') {
+    tube.resetIndex()
   } else if (command === 'simpleSearch' || command === 'search' || command === 'ss') {
     console.log(await tube.simpleSearch(...args))
   } else if (command === 'fuzzySearch' || command === 'fs') {
