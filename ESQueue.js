@@ -1,4 +1,5 @@
 const debounce = require('lodash.debounce')
+const { log } = require('./utils')
 
 class ESQueue {
   constructor (esClient, logSetting) {
@@ -60,7 +61,4 @@ class ESQueue {
   }
 }
 
-const log = (msg, logging) => logging && console.log(msg)
-
 module.exports = ESQueue
-
