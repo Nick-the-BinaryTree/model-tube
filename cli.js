@@ -33,7 +33,22 @@ const printIndexUsage = () => {
 const printResetUsage = () => {
   console.log('\nReset Command')
   console.log('tube reset')
-  console.log('Wipes Elasticsearch index in settings (careful!)')
+  console.log('Wipes Elasticsearch index in settings (careful!)\n')
+}
+
+const printCreateIndexUsage = () => {
+  console.log('\nCreate Command')
+  console.log('tube create')
+  console.log('Creates a blank index with the name specified in setting')
+  console.log('Note: The above will do nothing if the index already exists\n')
+}
+
+const printClearTypesUsage = () => {
+  console.log('\nClear Types Command')
+  console.log('tube clearTypes [model names (space-separated)]')
+  console.log('Removes all models with the name specified from the index.')
+  console.log('Ex: tube clearTypes Resource Facility Order')
+  console.log('Shortcut: "ct" can be used instead of "clearTypes"\n')
 }
 
 const printSearchUsage = () => {
@@ -51,19 +66,24 @@ const printSearchUsage = () => {
   console.log('-Raw query has no command b/c typing JSON into a terminal is not optimal')
 }
 
-const printUsage = () => {
+const printHelp = () => {
   printConfigUsage()
   printIndexUsage()
+  console.log('\nTo learn about searching, type: tube help search\n')
+  console.log('\nFor more commands, type: tube help 2\n')
+}
+
+const printHelp2 = () => {
   printResetUsage()
-  console.log('\nTo learn about searching, type: tube help search')
+  printCreateIndexUsage()
+  printClearTypesUsage()
 }
 
 const commands = async () => {
   if (process.argv.length <= 2) {
-    printUsage()
+    printHelp()
     return
   }
-  console.log(process.argv)
   const [command, ...args] = process.argv.slice(2) // First two args are "node" and [filename]
   if ((command === 'config' || command === 'c') && args.length >= 1) {
     if (args[0] === '-i') {
@@ -82,14 +102,25 @@ const commands = async () => {
     tube.index(args)
   } else if (command === 'reset') {
     tube.resetIndex()
+  } else if (command === 'create') {
+    tube.clearTypes(args)
+  } else if (command === 'clearTypes') {
+    tube.resetIndex()
   } else if (command === 'simpleSearch' || command === 'search' || command === 'ss') {
     console.log(await tube.simpleSearch(...args))
   } else if (command === 'fuzzySearch' || command === 'fs') {
     console.log(await tube.fuzzySearch(...args))
-  } else if (command === 'help' && args && args[0] === 'search') {
-    printSearchUsage()
-  } else {
-    printUsage()
+  } else if (command === 'help') {
+    if (!args || args[0] === '1') {
+      printHelp()
+    }
+    if (args[0] === 'search') {
+      printSearchUsage()
+    } else if (args[0] === '2') {
+      printHelp2()
+    } else {
+      printHelp()
+    }
   }
 }
 

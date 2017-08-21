@@ -53,6 +53,21 @@ Shortcut: `i` can be used instead of `index`
 
 Wipes Elasticsearch index in settings (careful!).
 
+### Create Command
+`tube create`
+
+Creates a blank index with the name specified in setting.
+Note: The above will do nothing if the index already exists.
+
+### Clear Types Command
+`tube clearTypes [model names (space-separated)]'``
+
+Removes all models with the name specified from the index.
+
+Ex: `tube clearTypes Resource Facility Order`
+
+'Shortcut: "ct" can be used instead of "clearTypes"
+
 ### Search Commands
 Three ways to simple search all models:
 `tube simpleSearch [search term] [optional: property to search]`
@@ -105,11 +120,13 @@ To reset the Elasticsearch index (essentially, wipe it):
 
 `tube.resetIndex()`
 
-To create a blank Elasticsearch index with the `es_index` name in settings:
+Creating a blank Elasticsearch index is similar to the CLI command:
 
 `tube.createIndex()`
 
-Note: The above will do nothing if the index already exists.
+Also similar to the CLI command, to clear all models of a certain type:
+
+`tube.clearTypes([array of model names])`
 
 Use the search features similarly to their CLI format:
 

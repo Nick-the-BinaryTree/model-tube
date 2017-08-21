@@ -1,5 +1,6 @@
 const elasticsearch = require('elasticsearch')
 const ESQueue = require('./ESQueue')
+const Search = require('./Search')
 const { arrayToObject, log } = require('./utils')
 
 class ModelTube {
@@ -14,8 +15,6 @@ class ModelTube {
       'blacklist': {},
       'logs': false
     }
-    this.hookActionQueue = []
-
     this.config = this.config.bind(this)
     this.updateWhiteOrBlackList = this.updateWhiteOrBlackList.bind(this)
     this.setEsClient = this.setEsClient.bind(this)
@@ -25,6 +24,7 @@ class ModelTube {
     this.removeHooks = this.removeHooks.bind(this)
     this.resetIndex = this.resetIndex.bind(this)
     this.index = this.index.bind(this)
+    this.clearTypes = this.clearTypes.bind(this)
     this.genEsQuery = this.genEsQuery.bind(this)
 
     if (initSettings) {
@@ -41,13 +41,19 @@ class ModelTube {
       this.setEsClient()
       if (this.esQueue) {
         this.esQueue.changeClient(this.esClient)
+        this.search.changeClient(this.esClient)
       } else {
         this.esQueue = new ESQueue(this.esClient)
+        this.search = new Search(this.esClient)
       }
     }
     const changedList = this.updateWhiteOrBlackList(settings)
     this.settings.models_path = settings.models_path || this.settings.models_path
-    this.settings.es_index = settings.es_index || this.settings.es_index
+
+    if (settings.es_index) {
+      this.settings.es_index = settings.es_index
+      this.search.changeIndexSetting(settings.es_index)
+    }
 
     if (settings.logs) {
       this.settings.logs = settings.logs
@@ -160,9 +166,13 @@ class ModelTube {
     let toIndex = []
     let completeCount = 0
 
-    toIndex = modelArgs && modelArgs.length > 0
-      ? modelArgs
-      : Object.keys(this.models)
+    if (modelArgs && modelArgs.length > 0) {
+      await this.clearTypes(modelArgs)
+      toIndex = modelArgs
+    } else {
+      await this.resetIndex()
+      toIndex = Object.keys(this.models)
+    }
 
     toIndex.forEach(async name => {
       const model = this.models[name]
@@ -174,39 +184,25 @@ class ModelTube {
     })
   }
 
-  async simpleSearch (searchTerm, propertyToSearch) {
-    propertyToSearch = propertyToSearch || '_all'
-    const results = await this.esClient.search({
-      index: this.settings.es_index,
-      q: propertyToSearch + ':' + searchTerm
+  async clearTypes (types) {
+    types.forEach(async type => {
+      await this.esClient.deleteByQuery({
+        index: this.settings.es_index,
+        type: type
+      })
     })
-    return results.hits.hits
+  }
+
+  async simpleSearch (searchTerm, propertyToSearch) {
+    return this.search.simpleSearch(searchTerm, propertyToSearch)
   }
 
   async fuzzySearch (searchTerm, modelName, propertyToSearch) {
-    let searchQuery = {
-      index: this.settings.es_index,
-      body: {
-        query: {
-          match: {}
-        }
-      }
-    }
-    propertyToSearch = propertyToSearch || '_all'
-    searchQuery.body.query.match[propertyToSearch] = {
-      query: searchTerm,
-      fuzziness: 'AUTO'
-    }
-    if (modelName) {
-      searchQuery['type'] = modelName.toLowerCase()
-    }
-    const results = await this.esClient.search(searchQuery)
-    return results.hits.hits
+    return this.search.fuzzySearch(searchTerm, modelName, propertyToSearch)
   }
 
   async rawQuery (queryJSON) {
-    const results = await this.esClient.search(queryJSON)
-    return results.hits.hits
+    return this.search.rawQuery(queryJSON)
   }
 
   genEsQuery (name, id) {

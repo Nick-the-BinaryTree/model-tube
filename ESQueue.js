@@ -33,13 +33,23 @@ class ESQueue {
     this.debouncedBulkQ()
   }
 
-  async resetIndex (index) {
+  async resetIndex (index, attempt = 1) {
     const esQuery = { index: index }
-    const exists = await this.esClient.indices.exists(esQuery)
-    if (exists) {
-      await this.esClient.indices.delete(esQuery)
+    try {
+      const exists = await this.esClient.indices.exists(esQuery)
+      if (exists) {
+        await this.esClient.indices.delete(esQuery)
+      }
+      await this.esClient.indices.create(esQuery)
+    } catch (error) {
+      if (attempt <= 5) {
+        console.error('\nElasticsearch probably not ready yet.')
+        console.error('Retry attempt ' + attempt + '/5\n')
+        setTimeout(() => this.resetIndex(index, attempt + 1), 2000)
+      } else {
+        console.error(error)
+      }
     }
-    await this.esClient.indices.create(esQuery)
   }
 
   async bulkQ () {
