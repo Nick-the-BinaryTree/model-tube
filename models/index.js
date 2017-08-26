@@ -6,14 +6,12 @@ const Sequelize = require('sequelize')
 
 const basename = path.basename(module.filename)
 
-let sequelizeConfig = {
-  'dialect': 'sqlite',
-  'storage': ':memory:',
-  'logging': false
-}
+const env = process.env.NODE_ENV || 'test'
+const config = require(path.join(__dirname, '../config/config.json'))[env]
+
 let db = {}
 
-const sequelize = new Sequelize('testDB', 'testerTim', null, sequelizeConfig)
+const sequelize = new Sequelize('testDB', null, null, config)
 
 fs
   .readdirSync(__dirname)

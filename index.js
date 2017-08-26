@@ -161,7 +161,7 @@ class ModelTube {
   }
 
   async index (modelArgs) {
-    this.resetIndex()
+    await this.resetIndex()
 
     let toIndex = []
     let completeCount = 0
@@ -197,8 +197,8 @@ class ModelTube {
     return this.search.simpleSearch(searchTerm, propertyToSearch)
   }
 
-  async fuzzySearch (searchTerm, modelName, propertyToSearch) {
-    return this.search.fuzzySearch(searchTerm, modelName, propertyToSearch)
+  async fuzzySearch (searchTerm, modelName, propertyToSearch, idOnly) {
+    return this.search.fuzzySearch(searchTerm, modelName, propertyToSearch, idOnly)
   }
 
   async rawQuery (queryJSON) {

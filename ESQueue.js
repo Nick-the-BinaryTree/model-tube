@@ -45,7 +45,7 @@ class ESQueue {
       if (attempt <= 5) {
         console.error('\nElasticsearch probably not ready yet.')
         console.error('Retry attempt ' + attempt + '/5\n')
-        setTimeout(() => this.resetIndex(index, attempt + 1), 2000)
+        setTimeout(() => this.resetIndex(index, attempt + 1), 3000)
       } else {
         console.error(error)
       }
@@ -66,8 +66,7 @@ class ESQueue {
       }
     })
     this.q = []
-    const response = await this.esClient.bulk({ body: data })
-    log(response, this.logSetting)
+    await this.esClient.bulk({ body: data })
   }
 }
 

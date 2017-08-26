@@ -27,7 +27,8 @@ class Search {
     return results.hits.hits
   }
 
-  async fuzzySearch (searchTerm, modelName, propertyToSearch) {
+  async fuzzySearch (searchTerm, modelName, propertyToSearch, idOnly) {
+    console.log(arguments)
     let searchQuery = {
       index: this.indexSetting,
       body: {
@@ -43,6 +44,9 @@ class Search {
     }
     if (modelName) {
       searchQuery['type'] = modelName.toLowerCase()
+    }
+    if (idOnly !== undefined) {
+      searchQuery.body['_source'] = false
     }
     const results = await this.esClient.search(searchQuery)
     return results.hits.hits
