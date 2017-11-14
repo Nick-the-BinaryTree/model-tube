@@ -1,5 +1,4 @@
 const debounce = require('lodash.debounce')
-const { log } = require('./utils')
 
 class ESQueue {
   constructor (esClient, logSetting) {

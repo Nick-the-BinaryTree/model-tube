@@ -75,12 +75,13 @@ Three ways to simple search all models:
 `tube ss [search term] [optional: property to search]`
 
 Two ways to fuzzy search:
-`tube fuzzySearch [search term] [optional: model name] [optional: property]`
-`tube fs [search term] [model name] [optional: property]`
+`tube fuzzySearch [search term] [optional: model name] [optional: property] [optional: id only]`
+`tube fs [search term] [optional: model name] [optional: property] [optional: id only]`
 
 Notes:
 * If no model name is provided, all models will be searched.
 * Also, if no property is provided, all properties will be searched.
+* If 'true' is entered for 'id only,' only the ids of matched search elements will be returned.
 * Raw query has no command b/c typing JSON into a terminal is not optimal.
 
 ## "In-Code" Usage
@@ -131,7 +132,7 @@ Also similar to the CLI command, to clear all models of a certain type:
 Use the search features similarly to their CLI format:
 
 `tube.simpleSearch([search term], [optional: property])`
-`tube.fuzzySearch([search term], [optional: model name], [optional: property])`
+`tube.fuzzySearch([search term], [optional: model name], [optional: property], [optional: id only])`
 `tube.rawQuery({query json})`
 
 ## Implementation Patterns
